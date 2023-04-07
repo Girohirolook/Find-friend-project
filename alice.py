@@ -48,8 +48,11 @@ class Alisa:
         self.response['user_state_update'] = self.response.get('user_state_update', {})
         self.response['user_state_update'][key] = value
 
-    def get_session_object(self, key):
-        return self.state_session.get(key, {})
+    def get_session_object(self, *args):
+        session_object = None
+        for key in args:
+            session_object = self.state_session.get(key, {})
+        return session_object
 
     def get_user_state_object(self, key):
         return self.user_state.get(key, {})

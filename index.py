@@ -10,6 +10,7 @@ session = Session()
 
 class ShowDialog:
     def handle_dialog(self, alisa):
+        # if 'отмена' in alisa.
         if 'registration' in alisa.state_session:
             return self.registration(alisa)
         if alisa.is_new_session():
@@ -33,28 +34,32 @@ class ShowDialog:
     def come_back(self, alisa, person):
         alisa.tts_with_text(person.name + '. Вы вернулись')
 
+    def start_registration(self, alisa):
+        alisa.add_to_session_state('registration', {'stage': 'loginEnter', 'name': '', 'about': '', 'tags': '', 'contacts': ''})
+
+    def end_registration(self, alisa):
+        print(alisa.state_session)
+
     def registration(self, alisa):
         alisa.restore_session_state()
         info = alisa.get_original_utterance()
-        if 'registration' not in alisa.state_session:
-            alisa.tts_with_text('Чтобы пользоваться данным навыком нужно для начала рассказать о себе.\n'
-                                'Введите ваш логин (Имя, которое будет видно всем)')
-            alisa.add_to_session_state('registration', {'name': '', 'about': '', 'tags': '', 'contacts': ''})
-        elif not alisa.get_session_object('registration').get('name'):
-            alisa.add_to_reg_state('name', info)
-            alisa.tts_with_text(f'Хорошо {info}. Теперь расскажи немного о себе (В одном сообщении):')
-        elif not alisa.get_session_object('registration').get('about'):
-            alisa.add_to_reg_state('about', info)
-            alisa.tts_with_text(f'Отлично. Чтобы найти людей по интересам нужно указать свои увлечения (В одном сообщении, Лучше через запятую).')
-        elif not alisa.get_session_object('registration').get('tags'):
-            alisa.add_to_reg_state('tags', info)
-            alisa.tts_with_text(f'Осталось последнее. нужно указать свои контакты, не волнуйся, их увидят только понравившиеся тебе люди')
-        elif not alisa.get_session_object('registration').get('contact'):
-            alisa.add_to_reg_state('contacts', info)
-            alisa.tts_with_text(f'Вот и всё, регистрация завершена. Теперь ты можешь просматривать других людей')
-            print(alisa.state_session)
-            alisa.remove_session_state_key('registration')
-
+        match alisa.get_session_object('registration', 'stage'):
+            case 'loginEnter':
+                alisa.tts_with_text('Чтобы пользоваться данным навыком нужно для начала рассказать о себе.\n'
+                                    'Введите ваш логин (Имя, которое будет видно всем)')
+                alisa.add_to_reg_state('stage', 'nameEnter')
+            case 'nameEnter':
+                alisa.tts_with_text(f'Хорошо {info}. Теперь расскажи немного о себе (В одном сообщении):')
+                alisa.add_to_reg_state('name', info)
+            case 'aboutEnter':
+                alisa.tts_with_text(f'Отлично. Чтобы найти людей по интересам нужно указать свои увлечения (В одном сообщении, Лучше через запятую).')
+                alisa.add_to_reg_state('about', info)
+            case 'tagsEnter':
+                alisa.tts_with_text(f'Осталось последнее. Нужно указать свои контакты, не волнуйся, их увидят только понравившиеся тебе люди')
+                alisa.add_to_reg_state('tags', info)
+            case 'contactsEnter':
+                alisa.tts_with_text(f'Вот и всё, регистрация завершена. Теперь ты можешь просматривать других людей')
+                alisa.add_to_reg_state('contacts', info)
 
 
     def new_session(self, alisa):
@@ -64,25 +69,25 @@ class ShowDialog:
         person = session.query(User).filter_by(user_id=alisa.user_id).first()
         if person:
             return self.come_back(alisa, person)
-        return self.registration(alisa)
+        return self.start_registration(alisa)
 
 
 
 dialog = ShowDialog()
 
 
-def main_handler(request, context):
-    response = {
-        "version": request['version'],
-        "response": {
-            "end_session": False
-        }
-    }
-
-    dialog.handle_dialog(Alisa(request, response))
-
-    session.close()
-    return response
+# def main_handler(request, context):
+#     response = {
+#         "version": request['version'],
+#         "response": {
+#             "end_session": False
+#         }
+#     }
+#
+#     dialog.handle_dialog(Alisa(request, response))
+#
+#     session.close()
+#     return response
 
 
 
@@ -114,6 +119,7 @@ def main():
     }
 
     dialog.handle_dialog(Alisa(request.json, response))
+
 
     return json.dumps(
         response,
