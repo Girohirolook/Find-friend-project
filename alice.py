@@ -42,16 +42,17 @@ class Alisa:
         del self.state_session[key]
 
     def restore_session_state(self):
-        self.response['session_state'] = self.state_session
+        if self.state_session:
+            self.response['session_state'] = self.state_session
 
     def update_user_state(self, key, value):
         self.response['user_state_update'] = self.response.get('user_state_update', {})
         self.response['user_state_update'][key] = value
 
     def get_session_object(self, *args):
-        session_object = None
+        session_object = self.state_session
         for key in args:
-            session_object = self.state_session.get(key, {})
+            session_object = session_object.get(key, {})
         return session_object
 
     def get_user_state_object(self, key):
