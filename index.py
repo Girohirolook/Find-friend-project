@@ -1,10 +1,11 @@
 from alice import Alisa
-from data.database import Session, create_db
+from data.database import Session
+from create_database import create_database
 import json
 from flask import Flask, request
-from data.user import User
+from data.__all_models import *
 
-create_db()
+create_database()
 session = Session()
 
 
@@ -32,7 +33,7 @@ class ShowDialog:
         alisa.end_session()
 
     def come_back(self, alisa, person):
-        alisa.tts_with_text(person.name + '. Вы вернулись')
+        alisa.tts_with_text(person.card.name + '. Вы вернулись')
 
     def start_registration(self, alisa):
         alisa.add_to_session_state('registration', {'stage': 'nameEnter', 'name': '', 'about': '', 'tags': '', 'contacts': ''})
@@ -40,10 +41,16 @@ class ShowDialog:
                             'Введите ваш логин (Имя, которое будет видно всем)')
 
     def end_registration(self, alisa):
-        print(alisa.state_session)
-        # new_user = User(**alisa.get_session_object('registration'))
-        # session.add(new_user)
-        # session.commit()
+        # Card add
+        user_card = Card(**alisa.state_session['registration'])
+        session.add(user_card)
+        session.commit()
+
+        # User add
+        user = User(user_id=alisa.user_id, card_id=user_card.id)
+        session.add(user)
+        session.commit()
+
         alisa.remove_session_state_key('registration')
 
     def registration(self, alisa):
