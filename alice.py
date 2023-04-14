@@ -85,6 +85,13 @@ class Alisa:
     def call_after(self, handler):
         self.add_transition('call_handler', {}, handler)
 
+    def show_card_item(self, header, title, description):
+        self.answer['card'] = {'type': 'ItemsList'}
+        self.answer['card']['header'] = {'text': header}
+        self.answer['card']['items'] = [{'title': title, 'description': description}]
+        self.button('Нравиться', None, payload={'liked': True})
+        self.button('Пропустить', None, payload={'liked': False})
+
     def add_transition(self, name, context, handler):
         self.response['session_state'] = self.response.get('session_state', {})
         self.response['session_state']['__transitions__'] = self.response.get('session_state', {}).get(
@@ -132,3 +139,6 @@ class Alisa:
 
     def has_intent(self, intent):
         return self.intents.get(intent)
+
+    def is_button(self):
+        return self.event['request']['type'] == "ButtonPressed"
