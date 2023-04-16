@@ -11,6 +11,7 @@ class Card(Base):
     about = Column(String)
     tags = Column(String)
     contacts = Column(String)
+    user = relationship('User', back_populates='card', uselist=False)
     # Image
     # description
     # Liked games

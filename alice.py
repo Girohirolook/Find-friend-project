@@ -45,9 +45,19 @@ class Alisa:
         if self.state_session:
             self.response['session_state'] = self.state_session
 
+    def get_user_state_update(self):
+        return self.response.get('user_state_update', {})
+
     def update_user_state(self, key, value):
         self.response['user_state_update'] = self.response.get('user_state_update', {})
         self.response['user_state_update'][key] = value
+
+    def update_skipped_list(self, value):
+        cards = self.get_skipped_list()
+        if value not in cards:
+            cards.append(value)
+            self.update_user_state('skipped', cards)
+
 
     def get_session_object(self, *args):
         session_object = self.state_session
@@ -57,6 +67,15 @@ class Alisa:
 
     def get_user_state_object(self, key):
         return self.user_state.get(key, {})
+
+    def get_skipped_list(self):
+        if self.get_user_state_update():
+            cards = self.get_user_state_update()['skipped']
+        else:
+            cards = self.get_user_state_object('skipped')
+        if not cards:
+            return []
+        return cards
 
     def end_session(self):
         self.answer['end_session'] = True
@@ -85,12 +104,12 @@ class Alisa:
     def call_after(self, handler):
         self.add_transition('call_handler', {}, handler)
 
-    def show_card_item(self, header, title, description):
+    def show_card_item(self, id, header, title, description):
         self.answer['card'] = {'type': 'ItemsList'}
         self.answer['card']['header'] = {'text': header}
         self.answer['card']['items'] = [{'title': title, 'description': description}]
-        self.button('Нравиться', None, payload={'liked': True})
-        self.button('Пропустить', None, payload={'liked': False})
+        self.button('Нравиться', None, payload={'liked': True, 'card': id})
+        self.button('Пропустить', None, payload={'liked': False, 'card': id})
 
     def add_transition(self, name, context, handler):
         self.response['session_state'] = self.response.get('session_state', {})
@@ -101,6 +120,9 @@ class Alisa:
 
     def get_button_payload_value(self, value):
         return self.event.get('request', {}).get('payload', {}).get(value, {})
+
+    def has_button_payload(self, value):
+        return value in self.event.get('request', {}).get('payload', {})
 
     def get_transitions(self):
         transitions = self.state_session.get('__transitions__', [])
