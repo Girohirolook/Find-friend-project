@@ -15,6 +15,7 @@ class ShowDialog:
         self.alisa = None
         self.user = None
 
+    # HANDLES
     def handle_dialog(self, alisa):
         self.alisa = alisa
         if self.is_accounted():
@@ -26,7 +27,7 @@ class ShowDialog:
         if self.alisa.command == 'да':
             self.test_del()
         if self.alisa.has_intent('Reset'):
-            self.alisa.remove_session_state()
+            self.reset()
         if 'registration' in self.alisa.state_session:
             return self.registration()
         if self.alisa.is_button():
@@ -44,42 +45,10 @@ class ShowDialog:
         elif self.alisa.has_button_payload('connections'):
             self.see_liked_peoples()
 
+    # BUTTON FUNCS
     def see_peoples_start(self):
         person_card = self.find_next_person()
         self.show_new_card(person_card)
-
-    def see_liked_peoples(self):
-        liked_cards = [row.liked_card for row in session.query(LikedUser).filter(LikedUser.user == self.user,
-                                                                                LikedUser.is_checked == False).all()]
-        user_card = self.user.card
-        users_who_liked = [i.user.card for i in session.query(LikedUser).filter(LikedUser.liked_card == user_card,
-                                                          LikedUser.is_checked == False).all()]
-        for card in liked_cards:
-            if card in users_who_liked:
-                print(card.user.user_id)
-
-
-
-
-    def find_next_person(self, skipped=None): # Доработать
-        if skipped is None:
-            skipped = []
-        liked_cards = [row.liked_card.id for row in session.query(LikedUser).filter(LikedUser.user == self.user).all()]
-        next_card: Card = session.query(Card).filter(Card.id.not_in(liked_cards + skipped), Card.id != self.user.card_id).first()
-
-        if not next_card:
-            current_card = self.alisa.get_session_object('card')
-            if isinstance(current_card, dict):
-                current_card = []
-            elif isinstance(current_card, int):
-                current_card = [current_card]
-            next_cards = session.query(Card).filter(Card.id.not_in(liked_cards + current_card),
-                                                         Card.id != self.user.card_id).all()
-            if len(next_cards) > 0:
-                next_card = random.choice(next_cards)
-            else:
-                return None
-        return next_card
 
     def see_peoples_process(self):
         response = self.alisa.get_button_payload_value('liked')
@@ -91,6 +60,30 @@ class ShowDialog:
         person_card = self.find_next_person(self.alisa.get_skipped_list())
         return self.show_new_card(person_card)
 
+    def see_liked_peoples(self):  # Переде
+        # user_card = self.user.card
+        # users_who_liked = [i.user.card.id for i in
+        #                    session.query(LikedUser).filter(LikedUser.liked_card == user_card).all()]
+        #
+        # liked_cards = session.query(LikedUser).filter(LikedUser.user == self.user,
+        #                                               LikedUser.is_checked == False,
+        #                                               LikedUser.liked_card_id.in_(
+        #                                                   users_who_liked)).all()
+        liked_cards = self.get_both_liked_cards()
+        if liked_cards:
+            return self.show_liked_cards(liked_cards)
+        return self.alisa.tts_with_text('Новые совпадения отсутствуют')
+
+    # SHOW FUNCS
+    def show_liked_cards(self, cards):
+        cards = cards[:5]
+        for card in cards:
+            card.is_checked = True
+        session.commit()
+        cards = [i.liked_card for i in cards]
+        self.alisa.show_cards(cards)
+        return self.greetings()
+
     def show_new_card(self, card):
         if card is None:
             return self.alisa.tts_with_text('Пользователи закончились')
@@ -98,23 +91,74 @@ class ShowDialog:
         self.alisa.add_to_session_state('card', card.id)
         return self.alisa.tts_with_text('')
 
-    def add_to_skipped(self, card_id):
-        # asdsdads
-        self.alisa.update_skipped_list(card_id)
-
+    # DATA FUNCS
     def add_connection_to_base(self, card_id):
-        liked_user = session.query(LikedUser).filter(LikedUser.user == self.user, LikedUser.liked_card_id == card_id).all()
+        self.delete_from_skipped(card_id)
+        liked_user = session.query(LikedUser).filter(LikedUser.user == self.user,
+                                                     LikedUser.liked_card_id == card_id).all()
         if not liked_user:
             liked = LikedUser(user=self.user, liked_card_id=card_id, is_checked=False)
             session.add(liked)
             session.commit()
 
+    def get_both_liked_cards(self):
+        user_card = self.user.card
+        users_who_liked = [i.user.card.id for i in
+                           session.query(LikedUser).filter(LikedUser.liked_card == user_card).all()]
+
+        return session.query(LikedUser).filter(LikedUser.user == self.user,
+                                                      LikedUser.is_checked == False,
+                                                      LikedUser.liked_card_id.in_(
+                                                          users_who_liked)).all()
+
+    def add_to_skipped(self, card_id):
+        # asdsdads
+        self.alisa.update_skipped_list(card_id)
+
+    def delete_from_skipped(self, card_id):
+        if card_id in self.alisa.get_skipped_list():
+            self.alisa.delete_from_skipped_list(card_id)
+
+    def find_next_person(self, skipped=None):  # Доработать
+        if skipped is None:
+            skipped = []
+        liked_cards = [row.liked_card.id for row in session.query(LikedUser).filter(LikedUser.user == self.user).all()]
+        next_card: Card = session.query(Card).filter(Card.id.not_in(liked_cards + skipped),
+                                                     Card.id != self.user.card_id).first()
+
+        if not next_card:
+            current_card = self.alisa.get_session_object('card')
+            if isinstance(current_card, dict):
+                current_card = []
+            elif isinstance(current_card, int):
+                current_card = [current_card]
+            next_cards = session.query(Card).filter(Card.id.not_in(liked_cards + current_card),
+                                                    Card.id != self.user.card_id).all()
+            if len(next_cards) > 0:
+                next_card = random.choice(next_cards)
+            else:
+                return None
+        return next_card
+
+    def add_user(self):
+        # Card add
+        user_card = Card(**self.alisa.state_session['registration'])
+        session.add(user_card)
+        session.commit()
+
+        # User add
+        user = User(user_id=self.alisa.user_id, card_id=user_card.id)
+        session.add(user)
+        session.commit()
+
+    # JUST COMMANDS
     def cancel_command(self):
         self.alisa.remove_session_state()
 
     def base_response(self):
         self.alisa.button('Просмотреть людей', 'yes', hide=True, payload={'see_people': 'start'})
         self.alisa.button('Новые совпадения', 'yes', hide=True, payload={'connections': 'start'})
+        self.alisa.button('История совпадений', 'yes', hide=True, payload={'connections_history': 'start'})
 
     def greetings(self):
         self.alisa.tts_with_text('Добро пожаловать в навык для поиска партнёра/друга/товарища для игры\n')
@@ -131,29 +175,19 @@ class ShowDialog:
         self.only_buttons()
         self.base_response()
 
+    def reset(self):
+        self.alisa.remove_session_state()
+        if not self.is_authorized():
+            self.greetings()
+            return self.start_registration()
+
+
+    # REGISTRATION FUNCS
     def start_registration(self):
-        self.alisa.add_to_session_state('registration', {'stage': 'nameEnter', 'name': '', 'about': '', 'tags': '', 'contacts': ''})
+        self.alisa.add_to_session_state('registration',
+                                        {'stage': 'nameEnter', 'name': '', 'about': '', 'tags': '', 'contacts': ''})
         self.alisa.tts_with_text('Чтобы пользоваться данным навыком нужно для начала рассказать о себе.\n'
-                            'Введите ваш логин (Имя, которое будет видно всем)')
-
-    def test_del(self):
-        self.alisa.update_user_state('skipped', [])
-        return self.greetings()
-
-    def end_registration(self):
-        # Card add
-        user_card = Card(**self.alisa.state_session['registration'])
-        session.add(user_card)
-        session.commit()
-
-        # User add
-        user = User(user_id=self.alisa.user_id, card_id=user_card.id)
-        session.add(user)
-        session.commit()
-
-        self.alisa.remove_session_state_key('registration')
-        self.only_buttons()
-        self.base_response()
+                                 'Введите ваш логин (Имя, которое будет видно всем)')
 
     def registration(self):
         self.alisa.restore_session_state()
@@ -164,37 +198,51 @@ class ShowDialog:
                 self.alisa.add_to_reg_state('name', info)
                 self.alisa.add_to_reg_state('stage', 'aboutEnter')
             case 'aboutEnter':
-                self.alisa.tts_with_text(f'Отлично. Чтобы найти людей по интересам нужно указать свои увлечения (В одном сообщении, через запятую).')
+                self.alisa.tts_with_text(
+                    f'Отлично. Чтобы найти людей по интересам нужно указать свои увлечения (В одном сообщении, '
+                    f'через запятую).')
                 self.alisa.add_to_reg_state('about', info)
                 self.alisa.add_to_reg_state('stage', 'tagsEnter')
             case 'tagsEnter':
-                self.alisa.tts_with_text(f'Осталось последнее. Нужно указать свои контакты, не волнуйся, их увидят только понравившиеся тебе люди')
+                self.alisa.tts_with_text(
+                    f'Осталось последнее. Нужно указать свои контакты, не волнуйся, их увидят только понравившиеся '
+                    f'тебе люди')
                 self.alisa.add_to_reg_state('tags', info)
                 self.alisa.add_to_reg_state('stage', 'contactsEnter')
             case 'contactsEnter':
-                self.alisa.tts_with_text(f'Вот и всё, регистрация завершена. Теперь ты можешь просматривать других людей')
+                self.alisa.tts_with_text(
+                    f'Вот и всё, регистрация завершена. Теперь ты можешь просматривать других людей.\n')
                 self.alisa.add_to_reg_state('contacts', info)
                 del self.alisa.state_session['registration']['stage']
                 self.end_registration()
 
-    def is_accounted(self):
-        if self.alisa.user_id:
-            return True
-        return False
+    def end_registration(self):
+        self.add_user()
+        self.alisa.remove_session_state_key('registration')
+        self.only_buttons()
+        self.base_response()
 
+    # SUB FUNCS
     def new_session(self):
         self.greetings()
         if self.user:
             return self.come_back()
         return self.start_registration()
 
-    # Насколько она важна????
+    def is_accounted(self):
+        if self.alisa.user_id:
+            return True
+        return False
+
     def is_authorized(self):
         return self.user is not None
 
+    def test_del(self):
+        self.alisa.update_user_state('skipped', [])
+        return self.greetings()
+
 
 dialog = ShowDialog()
-
 
 # def main_handler(request, context):
 #     response = {
@@ -223,7 +271,6 @@ def index():
 
 @app.route("/", methods=['POST'])
 def main():
-
     response = {
         "version": request.json['version'],
         "response": {
@@ -232,7 +279,6 @@ def main():
     }
 
     dialog.handle_dialog(Alisa(request.json, response))
-
 
     return json.dumps(
         response,
@@ -243,4 +289,3 @@ def main():
 
 if __name__ == '__main__':
     app.run('192.168.25.17', port=26080)
-

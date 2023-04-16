@@ -58,6 +58,11 @@ class Alisa:
             cards.append(value)
             self.update_user_state('skipped', cards)
 
+    def delete_from_skipped_list(self, value):
+        cards = self.get_skipped_list()
+        del cards[cards.index(value)]
+        self.update_user_state('skipped', cards)
+
 
     def get_session_object(self, *args):
         session_object = self.state_session
@@ -110,6 +115,18 @@ class Alisa:
         self.answer['card']['items'] = [{'title': title, 'description': description}]
         self.button('Нравиться', None, payload={'liked': True, 'card': id})
         self.button('Пропустить', None, payload={'liked': False, 'card': id})
+
+    def show_cards(self, cards):
+        self.answer['card'] = {'type': 'ItemsList'}
+        self.answer['card']['header'] = {'text': f'Найдено {len(cards)} пользователей. Нажмите на них чтобы посмотреть контакты'}
+        items = []
+        for card in cards:
+            items.append({'title': card.name, 'description': card.about, 'button':
+                {'text': 'Посмотреть контакты', 'payload': {'see_contacts': card.id}}})
+        self.answer['card']['items'] = items
+        self.answer['card']['footer'] = {'text': 'Посмотреть следующих', 'button': {'text': 'Посмотреть следующих', 'payload': {'connections': 'next'}}}
+        # self.button('Нравиться', None, payload={'liked': True, 'card': id})
+        # self.button('Пропустить', None, payload={'liked': False, 'card': id})
 
     def add_transition(self, name, context, handler):
         self.response['session_state'] = self.response.get('session_state', {})
