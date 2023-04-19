@@ -63,7 +63,6 @@ class Alisa:
         del cards[cards.index(value)]
         self.update_user_state('skipped', cards)
 
-
     def get_session_object(self, *args):
         session_object = self.state_session
         for key in args:
@@ -109,12 +108,26 @@ class Alisa:
     def call_after(self, handler):
         self.add_transition('call_handler', {}, handler)
 
-    def show_card_item(self, id, header, title, description):
+    def show_card_item(self, card_id, header, title, description):
         self.answer['card'] = {'type': 'ItemsList'}
         self.answer['card']['header'] = {'text': header}
         self.answer['card']['items'] = [{'title': title, 'description': description}]
-        self.button('Нравиться', None, payload={'liked': True, 'card': id})
-        self.button('Пропустить', None, payload={'liked': False, 'card': id})
+        self.button('Нравиться', None, payload={'liked': True, 'card': card_id})
+        self.button('Пропустить', None, payload={'liked': False, 'card': card_id})
+
+    def show_one_card(self, name, about, tags, contacts):
+        self.answer['card'] = {'type': 'ItemsList'}
+        self.answer['card']['header'] = {'text': name}
+        self.answer['card']['items'] = [{'title': about, 'description': tags}]
+        self.answer['card']['footer'] = {'text': contacts}
+
+    def show_change_registration_block(self):
+        self.answer['card'] = {'type': 'ItemsList'}
+        self.answer['card']['header'] = {'text': 'Выбери то что хочешь изменить'}
+        change_types = {'Имя': 'name', 'О себе': 'about', 'Увлечения': 'tags', 'Контакты': 'contacts'}
+        self.answer['card']['items'] = [{}]
+        for k, v in change_types.items():
+            self.button(k, None, payload={'registration_change': {'type': v}})
 
     def show_cards(self, cards):
         self.answer['card'] = {'type': 'ItemsList'}
@@ -124,8 +137,8 @@ class Alisa:
             items.append({'title': card.name, 'description': card.about, 'button':
                 {'text': 'Посмотреть контакты', 'payload': {'see_contacts': card.id}}})
         self.answer['card']['items'] = items
-        self.answer['card']['footer'] = {'text': 'Посмотреть следующих', 'button': {'text': 'Посмотреть следующих', 'payload': {'connections': 'next'}}}
-        # self.button('Нравиться', None, payload={'liked': True, 'card': id})
+        # self.answer['card']['footer'] = {'text': 'Посмотреть следующих', 'button': {'text': 'Посмотреть следующих', 'payload': {payload: 'next'}}}
+        # self.button('Посмотреть следующих', None, payload={'connections': 'next'})
         # self.button('Пропустить', None, payload={'liked': False, 'card': id})
 
     def add_transition(self, name, context, handler):
