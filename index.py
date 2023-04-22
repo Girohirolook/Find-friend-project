@@ -239,15 +239,15 @@ class ShowDialog:
     def update_user(self):
         card = self.user.card
         text = self.alisa.get_original_utterance()
-        match self.alisa.get_session_object('registration_change'):
-            case 'name':
-                card.name = text
-            case 'about':
-                card.about = text
-            case 'tags':
-                card.tags = text
-            case 'contacts':
-                card.contacts = text
+        field = self.alisa.get_session_object('registration_change')
+        if field == 'name':
+            card.name = text
+        elif field == 'about':
+            card.about = text
+        elif field == 'tags':
+            card.tags = text
+        elif field == 'contacts':
+            card.contacts = text
         session.commit()
         self.base_response()
         return self.alisa.tts_with_text("Значение успешно изменено")
@@ -268,7 +268,6 @@ class ShowDialog:
         self.alisa.tts_with_text('Я вас не поняла \n')
         self.only_buttons()
         self.base_response()
-
 
     def cancel_command(self):
         self.alisa.remove_session_state()
@@ -310,37 +309,34 @@ class ShowDialog:
         self.alisa.tts_with_text('Чтобы пользоваться данным навыком нужно для начала рассказать о себе.\n'
                                  'Придумай свой логин (Имя, которое будет видно всем)')
 
-
-
-
     def registration(self):
         self.alisa.restore_session_state()
         info = self.alisa.get_original_utterance()
         if len(info) >= 255:
             return self.alisa.tts_with_text('Поле слишком длинное. Попробуй ещё раз.')
-        match self.alisa.get_session_object('registration', 'stage'):
-            case 'nameEnter':
-                self.alisa.tts_with_text(f'Хорошо {info}. Теперь расскажи немного о себе (В одном сообщении):')
-                self.alisa.add_to_reg_state('name', info)
-                self.alisa.add_to_reg_state('stage', 'aboutEnter')
-            case 'aboutEnter':
-                self.alisa.tts_with_text(
-                    f'Отлично. Чтобы найти людей по интересам нужно указать свои увлечения (В одном сообщении, '
-                    f'через запятую).')
-                self.alisa.add_to_reg_state('about', info)
-                self.alisa.add_to_reg_state('stage', 'tagsEnter')
-            case 'tagsEnter':
-                self.alisa.tts_with_text(
-                    f'Осталось последнее. Нужно указать свои контакты, не волнуйся, их увидят только понравившиеся '
-                    f'тебе люди')
-                self.alisa.add_to_reg_state('tags', info)
-                self.alisa.add_to_reg_state('stage', 'contactsEnter')
-            case 'contactsEnter':
-                self.alisa.tts_with_text(
-                    f'Вот и всё, регистрация завершена. Теперь ты можешь просматривать других людей.\n')
-                self.alisa.add_to_reg_state('contacts', info)
-                del self.alisa.state_session['registration']['stage']
-                self.end_registration()
+        field = self.alisa.get_session_object('registration', 'stage')
+        if field == 'nameEnter':
+            self.alisa.tts_with_text(f'Хорошо {info}. Теперь расскажи немного о себе (В одном сообщении):')
+            self.alisa.add_to_reg_state('name', info)
+            self.alisa.add_to_reg_state('stage', 'aboutEnter')
+        elif field == 'aboutEnter':
+            self.alisa.tts_with_text(
+                f'Отлично. Чтобы найти людей по интересам нужно указать свои увлечения (В одном сообщении, '
+                f'через запятую).')
+            self.alisa.add_to_reg_state('about', info)
+            self.alisa.add_to_reg_state('stage', 'tagsEnter')
+        elif field == 'tagsEnter':
+            self.alisa.tts_with_text(
+                f'Осталось последнее. Нужно указать свои контакты, не волнуйся, их увидят только понравившиеся '
+                f'тебе люди')
+            self.alisa.add_to_reg_state('tags', info)
+            self.alisa.add_to_reg_state('stage', 'contactsEnter')
+        elif field == 'contactsEnter':
+            self.alisa.tts_with_text(
+                f'Вот и всё, регистрация завершена. Теперь ты можешь просматривать других людей.\n')
+            self.alisa.add_to_reg_state('contacts', info)
+            del self.alisa.state_session['registration']['stage']
+            self.end_registration()
 
     def end_registration(self):
         self.add_user()

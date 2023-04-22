@@ -1,5 +1,8 @@
 from datetime import date, datetime
 
+import pymorphy2.analyzer
+from pymorphy2.analyzer import MorphAnalyzer
+
 
 class Alisa:
     def __init__(self, request: dict, response: dict):
@@ -130,16 +133,18 @@ class Alisa:
             self.button(k, None, payload={'registration_change': {'type': v}})
 
     def show_cards(self, cards):
+        analyzer = MorphAnalyzer()
+        find = 'Найдено'
+        if len(cards) == 1:
+            find = 'Найден'
+        users = analyzer.parse('пользователь')[0]
         self.answer['card'] = {'type': 'ItemsList'}
-        self.answer['card']['header'] = {'text': f'Найдено {len(cards)} пользователей. Нажмите на них чтобы посмотреть контакты'}
+        self.answer['card']['header'] = {'text': f'{find} {len(cards)} {users.make_agree_with_number(len(cards)).word}. Нажмите на них чтобы посмотреть контакты'}
         items = []
         for card in cards:
             items.append({'title': card.name, 'description': card.about, 'button':
                 {'text': 'Посмотреть контакты', 'payload': {'see_contacts': card.id}}})
         self.answer['card']['items'] = items
-        # self.answer['card']['footer'] = {'text': 'Посмотреть следующих', 'button': {'text': 'Посмотреть следующих', 'payload': {payload: 'next'}}}
-        # self.button('Посмотреть следующих', None, payload={'connections': 'next'})
-        # self.button('Пропустить', None, payload={'liked': False, 'card': id})
 
     def add_transition(self, name, context, handler):
         self.response['session_state'] = self.response.get('session_state', {})
