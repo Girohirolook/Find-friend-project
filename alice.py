@@ -126,7 +126,7 @@ class Alisa:
 
     def show_change_registration_block(self):
         self.answer['card'] = {'type': 'ItemsList'}
-        self.answer['card']['header'] = {'text': 'Выбери то что хочешь изменить'}
+        self.answer['card']['header'] = {'text': 'Выберите то что хотите изменить'}
         change_types = {'Имя': 'name', 'О себе': 'about', 'Увлечения': 'tags', 'Контакты': 'contacts'}
         self.answer['card']['items'] = [{}]
         for k, v in change_types.items():

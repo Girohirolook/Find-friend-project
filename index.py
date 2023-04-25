@@ -22,8 +22,6 @@ class ShowDialog:
             self.user = session.query(User).filter(User.user_id == self.alisa.user_id).first()
         else:
             return self.not_accounted()
-        if self.alisa.command == 'да':
-            self.test_del()
         if self.alisa.is_new_session():
             return self.new_session()
         if self.alisa.has_intent('Reset'):
@@ -38,7 +36,7 @@ class ShowDialog:
         if 'registration' in self.alisa.state_session:
             return self.registration()
         if 'registration_change' in self.alisa.state_session:
-             return self.update_user()
+            return self.update_user()
 
         return self.dont_understand()
 
@@ -59,23 +57,43 @@ class ShowDialog:
     def help_response(self):
         if 'registration' in self.alisa.state_session:
             self.alisa.restore_session_state()
-            return self.alisa.tts_with_text('Сейчас ты регистрируешься в этом навыке.\n Нужно ввести то, что от тебя просят')
+            self.alisa.tts_with_text('Сейчас вы регистрируетесь в навыке "TEAM SEARCH".\n')
+            return self.help_registration()
         elif 'registration_change' in self.alisa.state_session:
             self.alisa.remove_session_state()
-        self.alisa.tts_with_text('Ты сейчас находишься в навыке для поиска друга\n')
+        self.alisa.tts_with_text('Вы сейчас находитесь в навыке "TEAM SEARCH"\n')
+        self.alisa.tts_with_text('\nНапишите "Что ты умеешь" чтобы увидеть список доступных команд\n')
         self.only_buttons()
         self.base_response()
 
     def what_can_you_do_response(self):
+        if 'registration_change' in self.alisa.state_session:
+            self.alisa.remove_session_state()
+        self.alisa.tts_with_text(
+            'Я умею предлагать разные анкеты людей и выдавать тех с которыми у вас одинаковые вкусы \n')
+        self.alisa.tts_with_text('Нажмите "Посмотреть анкеты" чтобы увидеть новые анкеты \n')
+        self.alisa.tts_with_text(
+            'Нажмите "Новые совпадения" или "История совпадений", чтобы увидеть с кем у вас похожие вкусы\n')
         if 'registration' in self.alisa.state_session:
             self.alisa.restore_session_state()
-            return self.alisa.tts_with_text('В данный момент, я ничего не умею. Для начала вам нужно зарегистрироваться в этом навыке')
-        elif 'registration_change' in self.alisa.state_session:
-            self.alisa.remove_session_state()
-        self.alisa.tts_with_text('Я умею предлагать разные анкеты людей и выдавать тех с которыми у вас одинаковые вкусы \n')
-        self.alisa.tts_with_text('Нажмите "Посмотреть анкеты" чтобы увидеть новые анкеты \n')
-        self.alisa.tts_with_text('Нажмите "Новые совпадения" или "История совпадений", чтобы увидеть с кем у вас похожие вкусы')
+            self.alisa.tts_with_text(
+                '\nВ данный момент эти функции заблокированы, так как вам нужно зарегестрироваться в навыке\n')
+            return self.help_registration()
         self.base_response()
+
+    def help_registration(self):
+        field = self.alisa.get_session_object('registration', 'stage')
+        if field == 'nameEnter':
+            self.alisa.tts_with_text(f'Придумайте и введите ваш логин')
+        elif field == 'aboutEnter':
+            self.alisa.tts_with_text(
+                f'Введите немного информации о себе')
+        elif field == 'tagsEnter':
+            self.alisa.tts_with_text(
+                f'Введите ваши увлечения (В одном сообщении, через запятую)')
+        elif field == 'contactsEnter':
+            self.alisa.tts_with_text(
+                f'Осталось последнее. Введите ваши контакты')
 
     # BUTTON FUNCS
     def see_peoples_start(self):
@@ -123,17 +141,27 @@ class ShowDialog:
         print(num + len(history_cards))
         self.show_history_cards(history_cards, num + len(history_cards))
 
-    def change_registration(self): # Изменение регистрации через itemlist
+    def change_registration(self):  # Изменение регистрации через itemlist
         button_payload: dict = self.alisa.get_button_payload_value('registration_change')
         if button_payload == 'start':
             self.alisa.show_change_registration_block()
             return self.alisa.tts_with_text('Выберите то что хотите изменить')
         else:
             self.add_change_to_state(button_payload['type'])
-            return self.alisa.tts_with_text('Введите новое значение')
+            return self.alisa.tts_with_text('\nВведите новое значение')
 
     def add_change_to_state(self, update_field):
         self.alisa.add_to_session_state('registration_change', update_field)
+        value = ''
+        if update_field == 'name':
+            value = self.user.card.name
+        elif update_field == 'about':
+            value = self.user.card.about
+        elif update_field == 'tags':
+            value = self.user.card.tags
+        elif update_field == 'contacts':
+            value = self.user.card.contacts
+        self.alisa.tts_with_text(f'Текущее значение: {value}\n')
 
     # SHOW FUNCS
     def show_one_card(self, card):
@@ -155,7 +183,8 @@ class ShowDialog:
     def show_history_cards(self, cards, value=0):
         if cards:
             self.alisa.show_cards(cards)
-            self.alisa.button('Посмотреть следующих', None, payload={'connections_history': {'type': 'next', 'value': value}})
+            self.alisa.button('Посмотреть следующих', None,
+                              payload={'connections_history': {'type': 'next', 'value': value}})
             return self.alisa.tts_with_text('Найдена история')
         return self.alisa.tts_with_text('Совпадения закончились')
         # self.alisa.button('Посмотреть предыдущих', None, payload={'connections_history': 'last'})
@@ -206,7 +235,7 @@ class ShowDialog:
             skipped = []
         liked_cards = [row.liked_card.id for row in session.query(LikedUser).filter(LikedUser.user == self.user).all()]
         next_card = session.query(Card).filter(Card.id.not_in(liked_cards + skipped),
-                                                     Card.id != self.user.card_id).all()
+                                               Card.id != self.user.card_id).all()
         if self.find_sort(next_card):
             next_card = next_card[0][0]
         else:
@@ -226,7 +255,8 @@ class ShowDialog:
     def find_sort(self, cards):
         if len(cards) == 0:
             return False
-        links = session.query(LikedUser).filter(LikedUser.user_id.in_([card.user.id for card in cards]), LikedUser.liked_card_id == self.user.card_id).all()
+        links = session.query(LikedUser).filter(LikedUser.user_id.in_([card.user.id for card in cards]),
+                                                LikedUser.liked_card_id == self.user.card_id).all()
         links = [i.user_id for i in links]
         for i in range(len(cards)):
             if cards[i].user.id in links:
@@ -263,6 +293,8 @@ class ShowDialog:
         session.add(user)
         session.commit()
 
+        self.user = user
+
     # JUST COMMANDS
     def dont_understand(self):
         self.alisa.tts_with_text('Я вас не поняла \n')
@@ -273,8 +305,13 @@ class ShowDialog:
         self.alisa.remove_session_state()
 
     def base_response(self):
+        both_liked_cards = self.get_both_liked_cards()
         self.alisa.button('Просмотреть анкеты', 'yes', hide=True, payload={'see_people': 'start'})
-        self.alisa.button('Новые совпадения', 'yes', hide=True, payload={'connections': 'start'})
+        if len(both_liked_cards) > 0:
+            self.alisa.button(f'({len(both_liked_cards)}) Новые совпадения', 'yes', hide=True,
+                              payload={'connections': 'start'})
+        else:
+            self.alisa.button('Новые совпадения', 'yes', hide=True, payload={'connections': 'start'})
         self.alisa.button('История совпадений', 'yes', hide=True, payload={'connections_history': {'type': 'start'}})
         self.alisa.button('Изменить данные', 'yes', hide=True, payload={'registration_change': 'start'})
         self.alisa.button('Что ты умеешь', 'yes', hide=True)
@@ -291,7 +328,7 @@ class ShowDialog:
         self.alisa.tts_with_text('Общение в этом навыке ведётся только с помощью кнопок.\n')
 
     def come_back(self):
-        self.alisa.tts_with_text(self.user.card.name + ', ты вернулся.\n')
+        self.alisa.tts_with_text(self.user.card.name + ', вы вернулись.\n')
         self.only_buttons()
         self.base_response()
 
@@ -306,34 +343,34 @@ class ShowDialog:
     def start_registration(self):
         self.alisa.add_to_session_state('registration',
                                         {'stage': 'nameEnter', 'name': '', 'about': '', 'tags': '', 'contacts': ''})
-        self.alisa.tts_with_text('Чтобы пользоваться данным навыком нужно для начала рассказать о себе.\n'
-                                 'Придумай свой логин (Имя, которое будет видно всем)')
+        self.alisa.tts_with_text('\n Чтобы пользоваться данным навыком нужно для начала рассказать о себе.\n'
+                                 'Придумайте и напишите свой логин (Имя, которое будет видно всем)')
 
     def registration(self):
         self.alisa.restore_session_state()
         info = self.alisa.get_original_utterance()
         if len(info) >= 255:
-            return self.alisa.tts_with_text('Поле слишком длинное. Попробуй ещё раз.')
+            return self.alisa.tts_with_text('Поле слишком длинное. Попробуйте ещё раз.')
         field = self.alisa.get_session_object('registration', 'stage')
         if field == 'nameEnter':
-            self.alisa.tts_with_text(f'Хорошо {info}. Теперь расскажи немного о себе (В одном сообщении):')
+            self.alisa.tts_with_text(f'Хорошо {info}. Теперь напиши немного о себе (В одном сообщении):')
             self.alisa.add_to_reg_state('name', info)
             self.alisa.add_to_reg_state('stage', 'aboutEnter')
         elif field == 'aboutEnter':
             self.alisa.tts_with_text(
-                f'Отлично. Чтобы найти людей по интересам нужно указать свои увлечения (В одном сообщении, '
+                f'Отлично. Чтобы найти людей по интересам нужно написать свои увлечения (В одном сообщении, '
                 f'через запятую).')
             self.alisa.add_to_reg_state('about', info)
             self.alisa.add_to_reg_state('stage', 'tagsEnter')
         elif field == 'tagsEnter':
             self.alisa.tts_with_text(
-                f'Осталось последнее. Нужно указать свои контакты, не волнуйся, их увидят только понравившиеся '
-                f'тебе люди')
+                f'Осталось последнее. Нужно написать свои контакты (телеграм, vk и т.п.), не волнуйтесь, их увидят только понравившиеся '
+                f'вам люди')
             self.alisa.add_to_reg_state('tags', info)
             self.alisa.add_to_reg_state('stage', 'contactsEnter')
         elif field == 'contactsEnter':
             self.alisa.tts_with_text(
-                f'Вот и всё, регистрация завершена. Теперь ты можешь просматривать других людей.\n')
+                f'Вот и всё, регистрация завершена. Теперь вы можете просматривать других людей.\n')
             self.alisa.add_to_reg_state('contacts', info)
             del self.alisa.state_session['registration']['stage']
             self.end_registration()
@@ -347,6 +384,7 @@ class ShowDialog:
     # SUB FUNCS
     def new_session(self):
         self.greetings()
+        self.alisa.tts_with_text('\n Данный навык поможет вам найти товарища для игры в какую-либо игру \n')
         if self.user:
             return self.come_back()
         return self.start_registration()
@@ -358,10 +396,6 @@ class ShowDialog:
 
     def is_authorized(self):
         return self.user is not None
-
-    def test_del(self):
-        self.alisa.update_user_state('skipped', None)
-        return self.greetings()
 
 
 dialog = ShowDialog()
@@ -410,4 +444,4 @@ def main():
 
 
 if __name__ == '__main__':
-    app.run('192.168.25.17', port=26080)
+    app.run('192.168.25.17', port=36080)
